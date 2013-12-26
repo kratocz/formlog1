@@ -1,0 +1,6 @@
+name = Form log 1
+description = Logs each form submission to database. You can find the log under reports.
+core = 7.x
+package = PK Utils
+version = "7.x-1.x-dev"
+dependencies[] = firstclass1

@@ -1,0 +1,65 @@
+<?php
+
+/**
+ * Implements hook_schema().
+ */
+function formlog1_schema() {
+    $schema['formlog1'] = array(
+        'description' => 'History of submitted forms.',
+        'fields' => array(
+            'id' => array(
+                'type' => 'serial',
+                'not null' => TRUE,
+                'description' => 'The primary identifier.',
+            ),
+            'uid' => array(
+                'type' => 'int',
+                'not null' => TRUE,
+                'description' => 'Who submitted it.',
+            ),
+            'name' => array(
+                'type' => 'text',
+                'size' => 'normal',
+                'not null' => TRUE,
+                'description' => 'User\'s login name.',
+            ),
+            'mail' => array(
+                'type' => 'text',
+                'size' => 'normal',
+                'not null' => TRUE,
+                'description' => 'User\'s e-mail address.',
+            ),
+            'time' => array(
+                'type' => 'int',
+                'not null' => TRUE,
+                'description' => 'When does user submitted it.',
+            ),
+            'form_id' => array(
+                'type' => 'text',
+                'size' => 'normal',
+                'not null' => TRUE,
+                'description' => 'Form ID.',
+            ),
+            'uri' => array(
+                'type' => 'text',
+                'size' => 'normal',
+                'not null' => TRUE,
+                'description' => 'Page URI.',
+            ),
+            'form' => array(
+                'type' => 'text',
+                'size' => 'medium',
+                'not null' => TRUE,
+                'description' => 'Serialized form variable.',
+            ),
+        ),
+        'primary key' => array('id'),
+        'foreign keys' => array(
+            'uid' => array(
+                'table' => 'user',
+                'columns' => array('uid' => 'uid'),
+            ),
+        ),
+    );
+    return $schema;
+}

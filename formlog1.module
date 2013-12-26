@@ -1,0 +1,223 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function formlog1_menu() {
+    $menu['admin/reports/formlog1'] = (new MenuItem1())
+                    ->setTitle('Form log 1')
+                    ->setDescription('History of submitted forms.')
+                    ->setPage('formlog1_list_page')
+                    ->setAccess(NULL, 'access formlog1')
+                    ->setType(MENU_NORMAL_ITEM)
+            ->raw;
+    $menu['admin/reports/formlog1/freshform/%'] = (new MenuItem1)
+                    ->setTitle('Resubmit fresh form')
+                    ->setPage('formlog1_freshform_page', [4])
+                    ->setAccess(NULL, 'access formlog1')
+                    ->setType(MENU_NORMAL_ITEM)
+            ->raw;
+    $menu['admin/reports/formlog1/filledform/%'] = (new MenuItem1)
+                    ->setTitle('Resubmit filled form')
+                    ->setPage('formlog1_filledform_page', [4])
+                    ->setAccess(NULL, 'access formlog1')
+                    ->setType(MENU_NORMAL_ITEM)
+            ->raw;
+    return $menu;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function formlog1_permission() {
+    return [
+        'access formlog1' => [
+            'title' => t('Access formlog1'),
+            'description' => t('Access history of submitted forms.'),
+        ],
+    ];
+}
+
+/**
+ * @return Formlog1Service
+ */
+function formlog1_service() {
+    $service = &drupal_static(__FUNCTION__, NULL);
+    if (!$service) {
+        $service = new Formlog1Service();
+    }
+    return $service;
+}
+
+class Formlog1Service {
+
+    private static $tableName = 'formlog1';
+
+    private function censore(&$form) {
+        if (isset($form['#type']) && isset($form['#value'])) {
+            if ($form['#type'] == 'password' || $form['#type'] == 'password_confirm') {
+                $form['#value'] = '';
+            }
+        }
+        foreach (array_keys($form) as $key) {
+            if ($key[0] != '#') {
+                $this->censore($form[$key]);
+            }
+        }
+    }
+
+    public function log($form) {
+        global $user;
+        $this->censore($form);
+        $data = [
+            'uid' => $user->uid,
+            'name' => $user->name,
+            'mail' => $user->mail,
+            'time' => REQUEST_TIME,
+            'uri' => request_uri(),
+            'form_id' => $form['#form_id'],
+            'form' => serialize($form),
+        ];
+        db_insert(self::$tableName)
+                ->fields($data)
+                ->execute();
+    }
+
+    function all() {
+        $all = db_select(self::$tableName, 'fl')
+                ->fields('fl')
+                ->orderBy('time')
+                ->execute()
+                ->fetchAll();
+        $result = [];
+        foreach ($all as $row) {
+            $result[] = new Formlog1Element($row);
+        }
+        return $result;
+    }
+
+    function find($id) {
+        $row = db_select(self::$tableName, 'fl')
+                ->fields('fl')
+                ->condition('id', $id)
+                ->execute()
+                ->fetch();
+        return new Formlog1Element($row);
+    }
+
+}
+
+/**
+ * @property int $id This log element ID
+ * @property int $uid User ID
+ * @property string $mail User's e-mail address
+ * @property int $time Time
+ * @property string $uri URI
+ * @property string $formId ID of the form
+ * @property array $form Form array
+ */
+class Formlog1Element extends Firstclass1 {
+
+    public $row;
+
+    public function __construct(stdClass $row = NULL) {
+        if ($row === NULL) {
+            $row = new stdClass();
+        }
+        assert(is_object($row));
+        $this->row = $row;
+    }
+
+    public function getId() {
+        return $this->row->id;
+    }
+
+    public function getUid() {
+        return $this->row->uid;
+    }
+
+    public function getMail() {
+        return $this->row->mail;
+    }
+
+    public function getTime() {
+        return $this->row->time;
+    }
+
+    public function getUri() {
+        return $this->row->uri;
+    }
+
+    public function getFormId() {
+        return $this->row->form_id;
+    }
+
+    public function getForm() {
+        return unserialize($this->row->form);
+    }
+
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function formlog1_form_alter(&$form, &$form_state, $form_id) {
+    $form['#submit'][] = 'formlog1_log';
+}
+
+/**
+ * Adds one submitted form to the log. It's called automatically.
+ * @param array $form The submitted form
+ * @param array $form_state State of the submitted form
+ */
+function formlog1_log(&$form, &$form_state) {
+    $service = formlog1_service();
+    $service->log($form);
+}
+
+function formlog1_list_page() {
+    $service = formlog1_service();
+
+    $all = $service->all();
+
+    $rows = [];
+
+    foreach ($all as $log) {
+        $operations = [
+            'resubmit' => [
+                '#markup' => l(t('resubmit'), 'admin/reports/formlog1/filledform/' . $log->id)
+            ],
+        ];
+        $user = user_load($log->uid);
+        if ($user) {
+            $userCell = l($user->name, 'user/' . $user->uid);
+        } else {
+            $userCell = $log->mail;
+        }
+        $uri = trim($log->uri, '/');
+        $pathCell = l($uri, $uri);
+        $formIdCell = l($log->formId, 'admin/reports/formlog1/freshform/' . $log->formId);
+
+        $rows[] = [
+            (new TableRowCell1)->setTitle(t('Time'))->setData(format_date($log->time))->raw,
+            (new TableRowCell1)->setTitle(t('Form'))->setData($formIdCell)->raw,
+            (new TableRowCell1)->setTitle(t('Path'))->setData($pathCell)->raw,
+            (new TableRowCell1)->setTitle(t('User'))->setData($userCell)->raw,
+            (new TableRowCell1)->setTitle(t('Operations'))->setData($operations)->raw,
+        ];
+    }
+
+    return (new Table1)->setRows($rows)->raw;
+}
+
+function formlog1_freshform_page($form_id) {
+    return drupal_get_form($form_id);
+}
+
+function formlog1_filledform_page($logId) {
+    $service = formlog1_service();
+
+    $logItem = $service->find($logId);
+
+    return $logItem->form;
+}
