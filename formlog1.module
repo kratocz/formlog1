@@ -86,7 +86,7 @@ class Formlog1Service {
     function all() {
         $all = db_select(self::$tableName, 'fl')
                 ->fields('fl')
-                ->orderBy('time')
+                ->orderBy('time', 'DESC')
                 ->execute()
                 ->fetchAll();
         $result = [];
@@ -185,7 +185,7 @@ function formlog1_list_page() {
     foreach ($all as $log) {
         $operations = [
             'resubmit' => [
-                '#markup' => l(t('resubmit'), 'admin/reports/formlog1/filledform/' . $log->id)
+                '#markup' => l(t('edit&resubmit'), 'admin/reports/formlog1/filledform/' . $log->id)
             ],
         ];
         $user = user_load($log->uid);
